@@ -104,8 +104,9 @@ sys_sigalarm(void)
   argaddr(1, &handler);
 
   myproc()->interval = interval;
-  myproc()->handler = (uint64*)handler;
-  
+  myproc()->handler = handler;
+  myproc()->ticks = 0;
+
   return 0;
 }
 

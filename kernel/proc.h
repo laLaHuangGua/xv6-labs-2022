@@ -106,6 +106,6 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   int interval;
-  void (*handler)();
+  uint64 handler;
   int ticks;
 };
