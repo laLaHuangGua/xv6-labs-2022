@@ -97,7 +97,16 @@ sys_uptime(void)
 uint64 
 sys_sigalarm(void)
 {
+  int interval;
+  uint64 handler;
 
+  argint(0, &interval);
+  argaddr(1, &handler);
+
+  myproc()->interval = interval;
+  myproc()->handler = (uint64*)handler;
+  
+  return 0;
 }
 
 uint64 
