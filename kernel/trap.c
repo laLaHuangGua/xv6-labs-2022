@@ -78,8 +78,12 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2) {
-    if(p->interval && ++p->ticks == p->interval) {
+    if(p->is_return && p->interval && ++p->ticks == p->interval) {
+      if((p->pre_tf = (uint64)kalloc()) == 0)
+        panic("alarm: no enough memory");
+      memmove((uint64*)p->pre_tf, p->trapframe, sizeof(struct trapframe));
       p->ticks = 0;
+      p->is_return = 0;
       p->trapframe->epc = p->handler;
     }
     yield();

@@ -108,4 +108,7 @@ struct proc {
   int interval;
   uint64 handler;
   int ticks;
+  int is_return;
+
+  uint64 pre_tf;
 };

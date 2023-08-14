@@ -99,13 +99,15 @@ sys_sigalarm(void)
 {
   int interval;
   uint64 handler;
+  struct proc *p = myproc();
 
   argint(0, &interval);
   argaddr(1, &handler);
 
-  myproc()->interval = interval;
-  myproc()->handler = handler;
-  myproc()->ticks = 0;
+  p->interval = interval;
+  p->handler = handler;
+  p->ticks = 0;
+  p->is_return = 1;
 
   return 0;
 }
@@ -113,5 +115,10 @@ sys_sigalarm(void)
 uint64 
 sys_sigreturn(void)
 {
-  return 0;
+  struct proc *p = myproc();
+  memmove(p->trapframe, (void*)p->pre_tf, sizeof(struct trapframe));
+  kfree((void*)p->pre_tf);
+  p->pre_tf = 0;
+  p->is_return = 1;
+  return p->trapframe->a0;
 }
