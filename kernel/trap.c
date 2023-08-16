@@ -75,6 +75,7 @@ usertrap(void)
     uint64 pa = PTE2PA((uint64)(*pte));
 
     if(*pte & PTE_C) {
+      printf("cow page fault\n");
       if(rcounts[_OFFSET(pa)] > 1) {
         uint64 ka = (uint64)kalloc();
         if(ka == 0) {
@@ -82,15 +83,18 @@ usertrap(void)
         } else {
           memset((void *)ka, 0, PGSIZE);
           va = PGROUNDDOWN(va);
-          if(mappages(p->pagetable, va, PGSIZE, ka, PTE_U|PTE_R|PTE_W) != 0){
+          uvmunmap(p->pagetable, va, 1, 0);
+          if(mappages(p->pagetable, va, PGSIZE, ka, PTE_U|PTE_R|PTE_W) != 0) {
             kfree((void *)ka);
             p->killed = 1;
           } else {
             rcounts[_OFFSET(pa)]--;
+            memmove((void *)ka, (void *)pa, PGSIZE);
           }
         }
       } else if(rcounts[_OFFSET(pa)] == 1) {
         *pte |= PTE_W;
+        *pte &= ~PTE_C;
       }
     }
   } else {

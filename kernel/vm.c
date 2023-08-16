@@ -380,16 +380,19 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
           return -1;
         } else {
           memset((void *)ka, 0, PGSIZE);
-          if(mappages(pagetable, va0, PGSIZE, ka, PTE_U|PTE_R|PTE_W) != 0){
+          uvmunmap(pagetable, va0, 1, 0);
+          if(mappages(pagetable, va0, PGSIZE, ka, PTE_U|PTE_R|PTE_W) != 0) {
             kfree((void *)ka);
             return -1;
           } else {
             rcounts[_OFFSET(pa0)]--;
+            memmove((void*)ka, (void*)pa0, PGSIZE);
             pa0 = ka;
           }
         }
       } else if(rcounts[_OFFSET(pa0)] == 1) {
         *pte |= PTE_W;
+        *pte &= ~PTE_C;
       }
     }
 
