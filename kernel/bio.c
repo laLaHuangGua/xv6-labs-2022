@@ -25,14 +25,12 @@
 
 #define BUCKET_SIZE 13
 
-struct {
-  struct spinlock lock;
-  struct buf buf[NBUF];
-} bcache;
+struct buf bcache[NBUF];
 
 struct {
   struct spinlock lock;
   struct buf *buf;
+  int avlbuf;
 } st[BUCKET_SIZE];
 
 static uint
@@ -42,25 +40,31 @@ hash(uint key)
 }
 
 static void
-reuse(struct buf **b, uint bukno)
+setup(struct buf **b, uint dev, uint blockno)
 {
-  struct buf *temp;
-
-  temp = st[bukno].buf;
-  st[bukno].buf = *b;
-  st[bukno].buf->next = temp;
+  (*b)->dev = dev;
+  (*b)->blockno = blockno;
+  (*b)->valid = 0;
+  (*b)->refcnt = 1;
 }
 
 void
 binit(void)
 {
   struct buf *b;
+  int i;
 
-  // initlock(&bcache.lock, "bcache");
-  for(int i = 0; i < BUCKET_SIZE; i++)
+  for(i = 0; i < NBUF; i++) {
+    uint hi = hash(i);
+    st[hi].avlbuf++;
+    b = st[hi].buf;
+    st[hi].buf = &bcache[i];
+    st[hi].buf->next = b;
+    initsleeplock(&bcache[i].lock, "buffer");
+  }
+
+  for(i = 0; i < BUCKET_SIZE; i++)
     initlock(&st[i].lock, "bcachebucket");
-  for(b = bcache.buf; b < bcache.buf+NBUF; b++)
-    initsleeplock(&b->lock, "buffer");
 } 
 
 // Look through buffer cache for block on device dev.
@@ -70,13 +74,16 @@ static struct buf*
 bget(uint dev, uint blockno)
 {
   struct buf *b;
+  struct buf *freepos = 0;
 
   uint i = hash(blockno);
 
   // Is the block already cached?
   acquire(&st[i].lock);
   for(b = st[i].buf; b != 0; b = b->next) {
-    if(b->dev == dev && b->blockno == blockno) {
+    if(b->refcnt == 0) {
+      freepos = b;
+    } else if(b->dev == dev && b->blockno == blockno) {
       b->refcnt++;
       release(&st[i].lock);
       acquiresleep(&b->lock);
@@ -85,20 +92,49 @@ bget(uint dev, uint blockno)
   }
 
   // Not cached.
-  // acquire(&bcache.lock);
-  for(int j = 0; j < NBUF; j++) {
-    b = &bcache.buf[j];
-    if(b->refcnt == 0) {
-      b->dev = dev;
-      b->blockno = blockno;
-      b->valid = 0;
-      b->refcnt = 1;
-      reuse(&b, i);
-      // release(&bcache.lock);
-      release(&st[i].lock);
-      acquiresleep(&b->lock);
-      return b;
+  // Check self 
+  if(freepos != 0) {
+    st[i].avlbuf--;
+    setup(&freepos, dev, blockno);
+    release(&st[i].lock);
+    acquiresleep(&freepos->lock);
+    return freepos;
+  }
+
+  // No space, steal it (need recheck?)
+  release(&st[i].lock);
+  for(int k = 0; k < BUCKET_SIZE; k++) {
+    if(k == i)
+      continue;
+    acquire(&st[k].lock);
+    if(st[k].avlbuf == 0) {
+      release(&st[k].lock);
+      continue;
     }
+    if(st[k].buf->refcnt == 0) {
+      b = st[k].buf;
+      st[k].buf = b->next;
+      b->next = 0;
+    } else {
+      for(b = st[k].buf; b->next->refcnt != 0; b = b->next)
+        ;
+      freepos = b->next;
+      b->next = b->next->next;
+      freepos->next = 0;
+      b = freepos;
+    }
+    st[k].avlbuf--;
+    release(&st[k].lock);
+
+    setup(&b, dev, blockno);
+
+    acquire(&st[i].lock);
+    freepos = st[i].buf;
+    st[i].buf = b;
+    b->next = freepos;
+    release(&st[i].lock);
+    acquiresleep(&b->lock);
+    return b;
   }
   panic("bget: no buffers");
 }
@@ -135,23 +171,12 @@ brelse(struct buf *b)
 
   releasesleep(&b->lock);
 
-  struct buf *k;
   uint i = hash(b->blockno);
 
   acquire(&st[i].lock);
   b->refcnt--;
-  if(b->refcnt == 0) {
-    if(st[i].buf == b) {
-      st[i].buf = b->next;
-    } else {
-      k = st[i].buf;
-      while(k->next != b && k->next != 0)
-        k = k->next;
-      k->next = b->next;
-    }
-    b->next = 0;
-  }
-
+  if(b->refcnt == 0)
+    st[i].avlbuf++;
   release(&st[i].lock);
 }
 
