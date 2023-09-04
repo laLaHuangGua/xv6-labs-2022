@@ -456,8 +456,8 @@ void
 itrunc(struct inode *ip)
 {
   int i, j;
-  struct buf *bp;
-  uint *a;
+  struct buf *bp, *bpmid;
+  uint *a, *amid;
 
   for(i = 0; i < NDIRECT; i++){
     if(ip->addrs[i]){
@@ -476,6 +476,27 @@ itrunc(struct inode *ip)
     brelse(bp);
     bfree(ip->dev, ip->addrs[NDIRECT]);
     ip->addrs[NDIRECT] = 0;
+  }
+
+  // free doubly-indirect blocks
+  if(ip->addrs[NDIRECT + 1]){
+    bp = bread(ip->dev, ip->addrs[NDIRECT]);
+    a = (uint*)bp->data;
+    for(i = 0; i < NINDIRECT; i++){
+      if(a[i]){
+        bpmid = bread(ip->dev, a[i]);
+        amid = (uint*)bpmid->data;
+        for(j = 0; j < NINDIRECT; j++){
+          if(amid[j])
+            bfree(ip->dev, amid[j]);
+        }
+        brelse(bpmid);
+        bfree(ip->dev, a[i]);
+      }
+    }
+    brelse(bp);
+    bfree(ip->dev, ip->addrs[NDIRECT + 1]);
+    ip->addrs[NDIRECT + 1] = 0;
   }
 
   ip->size = 0;
