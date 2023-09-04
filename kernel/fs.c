@@ -376,33 +376,20 @@ iunlockput(struct inode *ip)
 // are listed in ip->addrs[].  The next NINDIRECT blocks are
 // listed in block ip->addrs[NDIRECT].
 
-// Return the disk block address of the nth block in inode ip.
-// If there is no such block, bmap allocates one.
-// returns 0 if out of disk space.
+// Load indirect block pointed by ip->addrs[pos], allocating if necessary
+// Return the disk block address
+// Return 0 if balloc() fail
 static uint
-bmap(struct inode *ip, uint bn)
+bload(struct inode *ip, uint bn, uint pos)
 {
   uint addr, *a;
   struct buf *bp;
 
-  if(bn < NDIRECT){
-    if((addr = ip->addrs[bn]) == 0){
+  if((addr = ip->addrs[pos]) == 0){
       addr = balloc(ip->dev);
       if(addr == 0)
         return 0;
-      ip->addrs[bn] = addr;
-    }
-    return addr;
-  }
-  bn -= NDIRECT;
-
-  if(bn < NINDIRECT){
-    // Load indirect block, allocating if necessary.
-    if((addr = ip->addrs[NDIRECT]) == 0){
-      addr = balloc(ip->dev);
-      if(addr == 0)
-        return 0;
-      ip->addrs[NDIRECT] = addr;
+      ip->addrs[pos] = addr;
     }
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
@@ -415,8 +402,51 @@ bmap(struct inode *ip, uint bn)
     }
     brelse(bp);
     return addr;
-  }
+}
 
+// Return the disk block address of the nth block in inode ip.
+// If there is no such block, bmap allocates one.
+// returns 0 if out of disk space.
+static uint
+bmap(struct inode *ip, uint bn)
+{
+  uint addr, *a;
+  struct buf *bp;
+
+  // Direct blocks
+  if(bn < NDIRECT){
+    if((addr = ip->addrs[bn]) == 0){
+      addr = balloc(ip->dev);
+      if(addr == 0)
+        return 0;
+      ip->addrs[bn] = addr;
+    }
+    return addr;
+  }
+  bn -= NDIRECT;
+
+  // Singly-indirect blocks
+  if(bn < NINDIRECT)
+    return bload(ip, bn, NDIRECT);
+
+  bn -= NINDIRECT;
+
+  // Doubly-indirect blocks
+  if(bn < NINDIRECT_DOUB){
+    // Load middle-indirect block
+    addr = bload(ip, bn / NINDIRECT, NDIRECT + 1);
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if((addr = a[bn % NINDIRECT]) == 0){
+      addr = balloc(ip->dev);
+      if(addr){
+        a[bn % NINDIRECT] = addr;
+        log_write(bp);
+      }
+    }
+    brelse(bp);
+    return addr;
+  }
   panic("bmap: out of range");
 }
 
