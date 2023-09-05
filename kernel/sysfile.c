@@ -301,6 +301,33 @@ create(char *path, short type, short major, short minor)
   return 0;
 }
 
+#define RCUR_DEPTH 10
+
+static int 
+walklink(struct inode **ipp, int nofollow)
+{
+  int depth = 0;
+  char target[MAXPATH];
+
+  if(nofollow)
+    return 0;
+
+  while((*ipp)->type == T_SYMLINK && depth++ < RCUR_DEPTH){
+    if(readi(*ipp, 0, (uint64)target, 0, MAXPATH) != MAXPATH)
+      panic("walksymlink: readi");
+
+    iunlockput(*ipp);
+
+    if((*ipp = namei(target)) == 0)
+      return -1;
+
+    ilock(*ipp);
+  }
+  if(depth > RCUR_DEPTH)
+    return -1;
+  return 0;
+}
+
 uint64
 sys_open(void)
 {
@@ -330,6 +357,12 @@ sys_open(void)
     ilock(ip);
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
+      end_op();
+      return -1;
+    }
+    if(ip->type == T_SYMLINK && walklink(&ip, omode & O_NOFOLLOW) < 0){
+      if(ip != 0)
+        iunlockput(ip);
       end_op();
       return -1;
     }
@@ -507,5 +540,27 @@ sys_pipe(void)
 uint64 
 sys_symlink(void)
 {
+  struct inode *ip;
+  char target[MAXPATH];
+  char path[MAXPATH];
 
+  begin_op();
+  if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0){
+    end_op();
+    return -1;
+  }
+
+  if((ip = create(path, T_SYMLINK, 0, 0)) == 0){
+    end_op();
+    return -1;
+  }
+
+  if(writei(ip, 0, (uint64)target, 0, MAXPATH) != MAXPATH)
+    panic("symlink: writei");
+
+  iunlockput(ip);
+
+  end_op();
+
+  return 0;
 }
