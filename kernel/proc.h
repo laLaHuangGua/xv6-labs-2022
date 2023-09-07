@@ -90,6 +90,7 @@ struct vma {
   int flags;
   int fd;
   int offset;
+  int pg;
   struct file *f;
 };
 

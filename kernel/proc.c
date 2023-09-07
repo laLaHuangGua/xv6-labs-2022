@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -350,6 +351,14 @@ exit(int status)
 
   if(p == initproc)
     panic("init exiting");
+
+  struct vma *a;
+  for(a = p->vma; a < &p->vma[NVMA]; a++){
+    if(a->flags & MAP_SHARED)
+      filewrite(a->f, a->addr, a->pg * PGSIZE);
+    uvmunmap(p->pagetable, a->addr, a->pg, 1);
+    fileclose(a->f);
+  }
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){

@@ -108,6 +108,8 @@ usertrap(void)
       if(mappages(p->pagetable, va, PGSIZE, pa, flags | PTE_U) < 0){
         kfree((void *)pa);
         p->killed = 1;
+      } else {
+        a->pg++;
       }
     }
   } else {

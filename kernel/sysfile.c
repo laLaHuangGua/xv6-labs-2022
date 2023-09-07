@@ -523,8 +523,13 @@ sys_mmap(void)
 
   argint(5, &offset);
 
+  if((prot & PROT_READ) && f->readable == 0)
+    return -1;
+  if((prot & PROT_WRITE) && f->writable == 0 && (flags & MAP_SHARED))
+    return -1;
+
   for (i = 0; i < NVMA; i++)
-    if(p->vma[i].len == 0)
+    if(p->vma[i].addr == 0)
       break;
   if(i == NVMA)
     return -1;
@@ -536,6 +541,7 @@ sys_mmap(void)
   p->vma[i].fd = fd;
   p->vma[i].offset = offset;
   p->vma[i].f = f;
+  p->vma[i].pg = 0;
 
   filedup(f);
   p->sz += len;
@@ -546,5 +552,37 @@ sys_mmap(void)
 uint64 
 sys_munmap(void)
 {
-  return -1;
+  uint64 va;
+  int len;
+  struct vma *a;
+  struct proc *p = myproc();
+
+  argaddr(0, &va);
+  argint(1, &len);
+
+  if(va >= MAXVA || va < 0)
+    return -1;
+
+  va = PGROUNDDOWN(va);
+  for(a = p->vma; a < &p->vma[NVMA]; a++)
+    if(a->addr <= va && a->addr + a->len > va)
+      break;
+  if(a == &p->vma[NVMA])
+    panic("munmap: not found va");
+
+  if(len % PGSIZE > a->pg)
+    len = a->pg * PGSIZE;
+
+  if(a->flags & MAP_SHARED)
+    filewrite(a->f, va, len);
+
+  uvmunmap(p->pagetable, va, len % PGSIZE, 1);
+
+  a->pg -= len;
+  if(a->pg == 0){
+    a->addr = 0;
+    fileclose(a->f);
+  }
+
+  return 0;
 }
