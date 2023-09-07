@@ -570,15 +570,15 @@ sys_munmap(void)
   if(a == &p->vma[NVMA])
     panic("munmap: not found va");
 
-  if(len % PGSIZE > a->pg)
+  if(len / PGSIZE > a->pg)
     len = a->pg * PGSIZE;
 
   if(a->flags & MAP_SHARED)
     filewrite(a->f, va, len);
 
-  uvmunmap(p->pagetable, va, len % PGSIZE, 1);
+  uvmunmap(p->pagetable, va, len / PGSIZE, 1);
 
-  a->pg -= len;
+  a->pg -= len / PGSIZE;
   if(a->pg == 0){
     a->addr = 0;
     fileclose(a->f);

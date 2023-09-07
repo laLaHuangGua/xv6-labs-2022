@@ -289,6 +289,16 @@ fork(void)
     return -1;
   }
 
+  // Copy vma from parent to child (deep copy)
+  struct vma *na;
+  struct vma *a;
+  for(a = p->vma, na = np->vma; a < &p->vma[NVMA]; a++, na++){
+    if(a->addr) {
+      memmove(na, a, sizeof(*a));
+      filedup(a->f);
+    }
+  }
+
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
@@ -354,10 +364,12 @@ exit(int status)
 
   struct vma *a;
   for(a = p->vma; a < &p->vma[NVMA]; a++){
-    if(a->flags & MAP_SHARED)
-      filewrite(a->f, a->addr, a->pg * PGSIZE);
-    uvmunmap(p->pagetable, a->addr, a->pg, 1);
-    fileclose(a->f);
+    if(a->addr){
+      if(a->flags & MAP_SHARED)
+        filewrite(a->f, a->addr, a->pg * PGSIZE);
+      uvmunmap(p->pagetable, a->addr, a->pg, 1);
+      fileclose(a->f);
+    }
   }
 
   // Close all open files.
