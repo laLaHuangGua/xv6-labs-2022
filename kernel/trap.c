@@ -83,18 +83,17 @@ usertrap(void)
     if(pa == 0){
       p->killed = 1;
     } else {
-      memset((void*)pa, 0, PGSIZE);
-
       va = PGROUNDDOWN(va);
       for(a = p->vma; a < &p->vma[NVMA]; a++)
         if(a->addr <= va && a->addr + a->len > va)
           break;
       if(a == &p->vma[NVMA])
         panic("usertrap: not found va");
-      
+
+      uint64 off = va - a->addr;
       ilock(a->f->ip);
       // Don't check the return value of readi(), probably not equal PGSIZE
-      readi(a->f->ip, 0, pa, va - a->addr + a->offset, PGSIZE);
+      readi(a->f->ip, 0, pa, off + a->offset, PGSIZE);
       iunlock(a->f->ip);
 
       int flags = 0;
@@ -109,7 +108,7 @@ usertrap(void)
         kfree((void *)pa);
         p->killed = 1;
       } else {
-        a->pg++;
+        a->pgmap |= 1 << (off / PGSIZE);
       }
     }
   } else {

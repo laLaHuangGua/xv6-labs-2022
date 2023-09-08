@@ -541,7 +541,7 @@ sys_mmap(void)
   p->vma[i].fd = fd;
   p->vma[i].offset = offset;
   p->vma[i].f = f;
-  p->vma[i].pg = 0;
+  p->vma[i].pgmap = 0;
 
   filedup(f);
   p->sz += len;
@@ -563,23 +563,30 @@ sys_munmap(void)
   if(va >= MAXVA || va < 0)
     return -1;
 
+  uint64 ubound;
+
   va = PGROUNDDOWN(va);
-  for(a = p->vma; a < &p->vma[NVMA]; a++)
-    if(a->addr <= va && a->addr + a->len > va)
+  for(a = p->vma; a < &p->vma[NVMA]; a++){
+    ubound = a->addr + a->len;
+    if(a->addr <= va && ubound > va)
       break;
+  }
   if(a == &p->vma[NVMA])
     panic("munmap: not found va");
 
-  if(len / PGSIZE > a->pg)
-    len = a->pg * PGSIZE;
+  if(va + len > ubound)
+    len = ubound - va;
 
   if(a->flags & MAP_SHARED)
     filewrite(a->f, va, len);
 
   uvmunmap(p->pagetable, va, len / PGSIZE, 1);
 
-  a->pg -= len / PGSIZE;
-  if(a->pg == 0){
+  uint16 base = (va - a->addr) / PGSIZE;
+  for(int i = 0; i < len / PGSIZE; i++)
+    a->pgmap &= ~(1 << (base + i));
+
+  if(a->pgmap == 0){
     a->addr = 0;
     fileclose(a->f);
   }

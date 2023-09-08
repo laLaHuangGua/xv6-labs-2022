@@ -293,7 +293,7 @@ fork(void)
   struct vma *na;
   struct vma *a;
   for(a = p->vma, na = np->vma; a < &p->vma[NVMA]; a++, na++){
-    if(a->addr) {
+    if(a->addr && a->pgmap) {
       memmove(na, a, sizeof(*a));
       filedup(a->f);
     }
@@ -364,10 +364,20 @@ exit(int status)
 
   struct vma *a;
   for(a = p->vma; a < &p->vma[NVMA]; a++){
-    if(a->addr){
-      if(a->flags & MAP_SHARED)
-        filewrite(a->f, a->addr, a->pg * PGSIZE);
-      uvmunmap(p->pagetable, a->addr, a->pg, 1);
+    if(a->addr && a->pgmap){
+      int flag = 0;
+      for(int i = 0; ; i++){
+        if(a->pgmap & (1 << i)){
+          flag = 1;
+          if(a->flags & MAP_SHARED)
+            filewrite(a->f, a->addr, PGSIZE);
+          uvmunmap(p->pagetable, a->addr, 1, 1);
+        } else {
+          if(flag == 1)
+            break;
+          a->addr += PGSIZE;
+        }
+      }
       fileclose(a->f);
     }
   }
