@@ -529,7 +529,7 @@ sys_mmap(void)
     return -1;
 
   for (i = 0; i < NVMA; i++)
-    if(p->vma[i].addr == 0)
+    if(p->vma[i].addr == 0 && p->vma[i].pgmap == 0)
       break;
   if(i == NVMA)
     return -1;
@@ -572,7 +572,7 @@ sys_munmap(void)
       break;
   }
   if(a == &p->vma[NVMA])
-    panic("munmap: not found va");
+    return 0;
 
   if(va + len > ubound)
     len = ubound - va;
@@ -585,6 +585,8 @@ sys_munmap(void)
   uint16 base = (va - a->addr) / PGSIZE;
   for(int i = 0; i < len / PGSIZE; i++)
     a->pgmap &= ~(1 << (base + i));
+
+  printf("unmappage va %x pgmap %d len %d\n", va, a->pgmap, len);
 
   if(a->pgmap == 0){
     a->addr = 0;

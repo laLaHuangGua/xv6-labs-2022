@@ -79,16 +79,18 @@ usertrap(void)
     if(va < 0 || va >= MAXVA)
       exit(-1);
 
+    va = PGROUNDDOWN(va);
+    for(a = p->vma; a < &p->vma[NVMA]; a++)
+      if(a->addr <= va && a->addr + a->len > va)
+        break;
+    if(a == &p->vma[NVMA])
+      goto common;
+
     uint64 pa = (uint64)kalloc();
     if(pa == 0){
       p->killed = 1;
     } else {
-      va = PGROUNDDOWN(va);
-      for(a = p->vma; a < &p->vma[NVMA]; a++)
-        if(a->addr <= va && a->addr + a->len > va)
-          break;
-      if(a == &p->vma[NVMA])
-        panic("usertrap: not found va");
+      memset((void*)pa, 0, PGSIZE);
 
       uint64 off = va - a->addr;
       ilock(a->f->ip);
@@ -109,9 +111,11 @@ usertrap(void)
         p->killed = 1;
       } else {
         a->pgmap |= 1 << (off / PGSIZE);
+        printf("mappages va %x pgmap %d\n", va, a->pgmap);
       }
     }
   } else {
+common:
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);
