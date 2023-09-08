@@ -586,8 +586,6 @@ sys_munmap(void)
   for(int i = 0; i < len / PGSIZE; i++)
     a->pgmap &= ~(1 << (base + i));
 
-  printf("unmappage va %x pgmap %d len %d\n", va, a->pgmap, len);
-
   if(a->pgmap == 0){
     a->addr = 0;
     fileclose(a->f);

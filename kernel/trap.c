@@ -111,7 +111,6 @@ usertrap(void)
         p->killed = 1;
       } else {
         a->pgmap |= 1 << (off / PGSIZE);
-        printf("mappages va %x pgmap %d\n", va, a->pgmap);
       }
     }
   } else {
