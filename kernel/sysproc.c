@@ -108,9 +108,11 @@ sys_trace(void)
 uint64 
 sys_sysinfo(void)
 {
-  struct proc *p = myproc();
-  struct sysinfo si = {count_freemem(), count_not_unused_proc()};
   uint64 addr;
+  struct proc *p = myproc();
+  struct sysinfo si = {
+    cntfreemem(), cntproc()
+  };
 
   argaddr(0, &addr);
   if(copyout(p->pagetable, addr, (char *)&si, sizeof(si)) < 0)

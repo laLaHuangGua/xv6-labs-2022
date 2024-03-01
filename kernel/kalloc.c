@@ -82,7 +82,7 @@ kalloc(void)
 }
 
 uint64
-count_freemem(void) 
+cntfreemem(void) 
 {
   int n = 0;
   struct run *r;

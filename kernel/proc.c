@@ -694,7 +694,7 @@ procdump(void)
 }
 
 int
-count_not_unused_proc(void)
+cntproc(void)
 {
   int count = 0;
   struct proc *p;
