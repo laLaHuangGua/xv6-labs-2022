@@ -16,6 +16,8 @@ void kernelvec();
 
 extern int devintr();
 
+extern int refcnt[];
+
 void
 trapinit(void)
 {
@@ -29,7 +31,6 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
-extern int rcount[];
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -71,14 +72,14 @@ usertrap(void)
   } else if(r_scause() == 15){
 
     uint64 va = r_stval();
-    if(va >= MAXVA || va <= 0)
+    if(va >= MAXVA || va == 0)
       exit(-1);
     pte_t *pte = walk(p->pagetable, va, 0);
     uint64 pa = PTE2PA((uint64)(*pte));
 
     if(*pte & PTE_C) {
-      uint64 po = pa / PGSIZE;
-      if(rcount[po] > 1) {
+      uint64 i = IPAGE(pa);
+      if(refcnt[i] > 1) {
         uint64 ka = (uint64)kalloc();
         if(ka == 0) {
           p->killed = 1;
@@ -89,11 +90,11 @@ usertrap(void)
             kfree((void *)ka);
             p->killed = 1;
           } else {
-            rcount[po]--;
+            refcnt[i]--;
             memmove((void *)ka, (void *)pa, PGSIZE);
           }
         }
-      } else if(rcount[po] == 1) {
+      } else if(refcnt[i] == 1) {
         *pte |= PTE_W;
         *pte &= ~PTE_C;
       }

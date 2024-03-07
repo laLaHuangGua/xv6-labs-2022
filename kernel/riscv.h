@@ -362,3 +362,6 @@ typedef uint64 *pagetable_t; // 512 PTEs
 // Sv39, to avoid having to sign-extend virtual addresses
 // that have the high bit set.
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
+
+// for reference count of physical pages
+#define IPAGE(pa) ((((uint64) (pa)) - KERNBASE) / PGSIZE)

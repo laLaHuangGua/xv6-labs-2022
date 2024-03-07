@@ -15,6 +15,8 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
+extern int refcnt[];
+
 // Make a direct-map page table for the kernel.
 pagetable_t
 kvmmake(void)
@@ -296,7 +298,6 @@ uvmfree(pagetable_t pagetable, uint64 sz)
   freewalk(pagetable);
 }
 
-extern int rcount[];
 // Given a parent process's page table, copy
 // its memory into a child's page table.
 // Copies both the page table and the
@@ -321,7 +322,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     pa = PTE2PA(*pte);
     if(mappages(new, i, PGSIZE, pa, flags) != 0)
       goto err;
-    rcount[(uint64)pa / PGSIZE]++;
+    refcnt[IPAGE(pa)]++;
   }
   return 0;
 
@@ -349,7 +350,7 @@ uvmclear(pagetable_t pagetable, uint64 va)
 int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
-  uint64 n, va0, pa0;
+  uint64 n, va0, pa0, ka;
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
@@ -363,25 +364,21 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
       n = len;
 
     pte_t *pte = walk(pagetable, va0, 0);
-    uint64 po = pa0 / PGSIZE;
+    uint64 i = IPAGE(pa0);
 
     if (*pte & PTE_C) {
-      if(rcount[po] > 1) {
-        uint64 ka = (uint64)kalloc();
-        if(ka == 0) {
+      if(refcnt[i] > 1) {
+        if((ka = (uint64)kalloc()) == 0)
           return -1;
-        } else {
-          memset((void *)ka, 0, PGSIZE);
-          if(mappages(pagetable, va0, PGSIZE, ka, PTE_U|PTE_R|PTE_W) != 0) {
-            kfree((void *)ka);
-            return -1;
-          } else {
-            rcount[po]--;
-            memmove((void*)ka, (void*)pa0, PGSIZE);
-            pa0 = ka;
-          }
+        memset((void *)ka, 0, PGSIZE);
+        if(mappages(pagetable, va0, PGSIZE, ka, PTE_U|PTE_R|PTE_W) != 0) {
+          kfree((void *)ka);
+          return -1;
         }
-      } else if(rcount[po] == 1) {
+        refcnt[i]--;
+        memmove((void*)ka, (void*)pa0, PGSIZE);
+        pa0 = ka;
+      } else if(refcnt[i] == 1) {
         *pte |= PTE_W;
         *pte &= ~PTE_C;
       }
