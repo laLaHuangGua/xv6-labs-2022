@@ -49,6 +49,9 @@ cowfault(pagetable_t pagetable, uint64 va)
 
   *pte = PA2PTE(ka) | PTE_W | PTE_R | PTE_X | PTE_U | PTE_V;
 
+  kfree((void *)pa); // decrease the reference count of pa
+                     // not actually free pa
+
   return 0;
 }
 
