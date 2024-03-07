@@ -32,7 +32,7 @@ trapinithart(void)
 int
 cowfault(pagetable_t pagetable, uint64 va) 
 {
-  if (va >= MAXVA)
+  if (va >= MAXVA || va == 0) // check va == 0 to pass textwrite test   
     return -1;
   
   pte_t* pte = walk(pagetable, va, 0);
