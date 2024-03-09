@@ -23,9 +23,31 @@ struct {
   struct run *freelist;
 } kmem[NCPU];
 
-// helper functions
-static void cpuid_s(int *id);
-static void steal(int curid, struct run **r);
+
+void
+cpuid_s(int* id)
+{
+  push_off();
+  *id = cpuid();
+  pop_off();
+}
+
+void 
+steal(int curid, struct run **r)
+{
+  for(int id = 0; id < NCPU; id++) {
+    if(id == curid)
+      continue;
+    acquire(&kmem[id].lock);
+    *r = kmem[id].freelist;
+    if(*r) {
+      kmem[id].freelist = (*r)->next;
+      release(&kmem[id].lock);
+      return;
+    }
+    release(&kmem[id].lock); 
+  }
+}
 
 void
 kinit()
@@ -93,30 +115,4 @@ kalloc(void)
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
-}
-
-static void
-cpuid_s(int* id)
-{
-  push_off();
-  *id = cpuid();
-  pop_off();
-}
-
-static void 
-steal(int curid, struct run **r)
-{
-  for(int other = 0; other < NCPU; other++) {
-    if(other == curid)
-      continue;
-    acquire(&kmem[other].lock);
-    *r = kmem[other].freelist;
-    if(*r) {
-      kmem[other].freelist = (*r)->next;
-      release(&kmem[other].lock);
-      return;
-    } else {
-      release(&kmem[other].lock);
-    } 
-  }
 }
