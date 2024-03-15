@@ -432,15 +432,16 @@ bmap(struct inode *ip, uint bn)
   bn -= NINDIRECT;
 
   // Doubly-indirect blocks
-  if(bn < NINDIRECT_DOUB){
+  if(bn < NDOUBINDIRECT){
     // Load middle-indirect block
     addr = bload(ip, bn / NINDIRECT, NDIRECT + 1);
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
-    if((addr = a[bn % NINDIRECT]) == 0){
+    uint off = bn % NINDIRECT;
+    if((addr = a[off]) == 0){
       addr = balloc(ip->dev);
       if(addr){
-        a[bn % NINDIRECT] = addr;
+        a[off] = addr;
         log_write(bp);
       }
     }
