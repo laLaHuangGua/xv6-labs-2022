@@ -16,6 +16,8 @@
 #include "file.h"
 #include "fcntl.h"
 
+#define RCUR_DEPTH 10
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -300,8 +302,6 @@ create(char *path, short type, short major, short minor)
   iunlockput(dp);
   return 0;
 }
-
-#define RCUR_DEPTH 10
 
 static int 
 walklink(struct inode **ipp, int nofollow)
