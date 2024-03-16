@@ -361,7 +361,7 @@ clearvma()
         if ((vp->pgmap & 1) != 0) {
           va = vp->va + cnt * PGSIZE;
           if (share)
-            writepgback(vp->file->ip, va, PGSIZE);
+            writepgback(vp, va, PGSIZE);
           uvmunmap(p->pagetable, va, 1, 1);
         }
       }
