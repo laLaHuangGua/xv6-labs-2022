@@ -545,8 +545,44 @@ sys_mmap(void)
   return vp->va;
 }
 
+static void
+writepgback(struct inode *ip, uint64 va, int len)
+{
+  begin_op();
+  ilock(ip);
+
+  writei(ip, 1, va, 0, len);
+
+  iunlock(ip);
+  end_op();
+}
+
 uint64 
 sys_munmap(void)
 {
-  return -1;
+  uint64 va;
+  int len;
+  struct vmarea *vp;
+  struct proc *p = myproc();
+
+  argaddr(0, &va);
+  argint(1, &len);
+
+  if ((vp = findvma(p->vma, va)) == 0)
+    return -1;
+  
+  for (int pg = len / PGSIZE, mapbit = (va - vp->va) / PGSIZE; 
+           pg > 0; 
+           va += PGSIZE, pg--, mapbit++) {
+    if (vp->flags & MAP_SHARED)
+      writepgback(vp->file->ip, va, PGSIZE);
+    uvmunmap(p->pagetable, va, PGSIZE, 1);
+    vp->pgmap &= ~(1 << mapbit);
+  }
+
+  if (vp->pgmap == 0) {
+    fileclose(vp->file);
+    vp->occupied = 0;
+  }
+  return 0;
 }

@@ -33,6 +33,19 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+struct vmarea* 
+findvma(struct vmarea *vmastart, uint64 va)
+{
+  struct vmarea *vp;
+  
+  for (vp = vmastart; vp < vmastart + NVMA; vp++)
+    if (vp->occupied && va >= vp->va && va < vp->va + vp->page * PGSIZE)
+      break;
+  if (vp == vmastart + NVMA)
+    return 0;
+  return vp;
+}
+
 int 
 mmapfault(struct proc *p, uint64 va)
 {
@@ -42,12 +55,9 @@ mmapfault(struct proc *p, uint64 va)
 
   va = PGROUNDDOWN(va);
 
-  for (vp = p->vma; vp < p->vma + NVMA; vp++)
-    if (vp->occupied && va >= vp->va && va < vp->va + vp->page * PGSIZE)
-      break;
-  if (vp == p->vma + NVMA)
+  if ((vp = findvma(p->vma, va)) == 0)
     return -1;
-
+  
   if ((pa = (uint64)kalloc()) == 0) 
     panic("mmapfault: kalloc");
   memset((void *)pa, 0, PGSIZE);

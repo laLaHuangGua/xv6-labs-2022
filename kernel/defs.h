@@ -8,6 +8,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct vmarea;
 
 // bio.c
 void            binit(void);
@@ -142,6 +143,7 @@ int             fetchaddr(uint64, uint64*);
 void            syscall();
 
 // trap.c
+struct vmarea*  findvma(struct vmarea *vmastart, uint64 va);
 extern uint     ticks;
 void            trapinit(void);
 void            trapinithart(void);
