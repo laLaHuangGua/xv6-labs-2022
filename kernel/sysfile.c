@@ -504,10 +504,44 @@ sys_pipe(void)
   return 0;
 }
 
+static int
+populatevma(struct vmarea *vp)
+{
+  struct file *f;
+  int len;
+
+  argaddr(0, &vp->va);
+  argint(1, &len);
+  argint(2, &vp->prot);
+  argint(3, &vp->flags);
+  if(argfd(4, 0, &f) < 0)
+    return -1;
+  argint(5, &vp->offset);
+
+  vp->file = f;
+  vp->page = len / PGSIZE;
+  vp->occupied = 1;
+  return 0;
+}
+
 uint64 
 sys_mmap(void)
 {
-  return -1;
+  struct proc *p = myproc();
+  struct vmarea *vp;
+
+  for (vp = p->vma; vp < p->vma + NVMA; vp++)
+    if (!vp->occupied) 
+      break;
+
+  if (populatevma(vp) < 0)
+    return -1;
+
+  vp->va = p->sz;
+  p->sz += vp->page * PGSIZE;
+
+  filedup(vp->file);
+  return vp->va;
 }
 
 uint64 

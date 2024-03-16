@@ -88,6 +88,7 @@ struct vmarea {
   int prot;
   int flags;
   int fd;
+  int occupied;
   struct file *file;
 };
 
