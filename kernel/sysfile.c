@@ -518,6 +518,11 @@ populatevma(struct vmarea *vp)
     return -1;
   argint(5, &vp->offset);
 
+  if (f->readable == 0 && vp->prot & PROT_READ) 
+    return -1;
+  if (f->writable == 0 && vp->prot & PROT_WRITE && vp->flags & MAP_SHARED)
+    return -1;
+
   vp->file = f;
   vp->page = len / PGSIZE;
   vp->occupied = 1;
