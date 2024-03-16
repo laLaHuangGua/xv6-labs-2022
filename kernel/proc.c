@@ -5,6 +5,10 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fs.h"
+#include "sleeplock.h"
+#include "file.h"
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -340,6 +344,32 @@ reparent(struct proc *p)
   }
 }
 
+static void 
+clearvma()
+{
+  struct vmarea *vp;
+  struct proc *p = myproc();
+  int cnt;
+  uint64 va;
+  int share;
+
+  for (vp = p->vma; vp < p->vma + NVMA; ++vp) {
+    if (vp->occupied) {
+      cnt = 0;
+      share = vp->flags & MAP_SHARED;
+      for (; vp->pgmap != 0; vp->pgmap >>= 1, cnt++) {
+        if ((vp->pgmap & 1) != 0) {
+          va = vp->va + cnt * PGSIZE;
+          if (share)
+            writepgback(vp->file->ip, va, PGSIZE);
+          uvmunmap(p->pagetable, va, 1, 1);
+        }
+      }
+      fileclose(vp->file);
+    }
+  }
+}
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait().
@@ -359,6 +389,8 @@ exit(int status)
       p->ofile[fd] = 0;
     }
   }
+
+  clearvma();
 
   begin_op();
   iput(p->cwd);

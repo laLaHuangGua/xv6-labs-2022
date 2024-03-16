@@ -545,7 +545,7 @@ sys_mmap(void)
   return vp->va;
 }
 
-static void
+void
 writepgback(struct inode *ip, uint64 va, int len)
 {
   begin_op();
@@ -576,7 +576,7 @@ sys_munmap(void)
            va += PGSIZE, pg--, mapbit++) {
     if (vp->flags & MAP_SHARED)
       writepgback(vp->file->ip, va, PGSIZE);
-    uvmunmap(p->pagetable, va, PGSIZE, 1);
+    uvmunmap(p->pagetable, va, 1, 1);
     vp->pgmap &= ~(1 << mapbit);
   }
 
