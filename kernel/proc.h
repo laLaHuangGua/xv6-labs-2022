@@ -89,6 +89,7 @@ struct vmarea {
   int flags;
   int fd;
   int occupied;
+  uint pgmap;
   struct file *file;
 };
 

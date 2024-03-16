@@ -67,6 +67,8 @@ mmapfault(struct proc *p, uint64 va)
     kfree((void *)pa);
     return -1;
   }
+
+  vp->pgmap |= 1 << (va - vp->va) / PGSIZE;
   return 0;
 }
 

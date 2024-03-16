@@ -521,6 +521,7 @@ populatevma(struct vmarea *vp)
   vp->file = f;
   vp->page = len / PGSIZE;
   vp->occupied = 1;
+  vp->pgmap = 0;
   return 0;
 }
 
