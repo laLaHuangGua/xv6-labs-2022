@@ -278,6 +278,20 @@ growproc(int n)
   return 0;
 }
 
+static void
+copyvma(struct proc *np, struct proc *p)
+{
+  struct vmarea *nvp;
+  struct vmarea *vp;
+
+  for (vp = p->vma, nvp = np->vma; vp < p->vma + NVMA; vp++, nvp++) {
+    if (vp->occupied) {
+      memmove((void *)nvp, (void *)vp, sizeof(struct vmarea));
+      filedup(vp->file);
+    }
+  }
+}
+
 // Create a new process, copying the parent.
 // Sets up child kernel stack to return as if from fork() system call.
 int
@@ -305,6 +319,8 @@ fork(void)
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
+
+  copyvma(np, p);
 
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
