@@ -382,6 +382,7 @@ clearvma()
         }
       }
       fileclose(vp->file);
+      vp->occupied = 0;
     }
   }
 }
