@@ -576,7 +576,7 @@ sys_munmap(void)
   argint(1, &len);
 
   if ((vp = findvma(p->vma, va)) == 0)
-    return -1;
+    return 0;
   
   for (int pg = len / PGSIZE, mapbit = (va - vp->va) / PGSIZE; 
            pg > 0; 
